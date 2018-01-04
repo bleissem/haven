@@ -9,13 +9,6 @@
 
 package org.havenapp.main.sensors.motion;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -31,15 +24,22 @@ import android.os.IBinder;
 import android.os.Message;
 import android.os.Messenger;
 import android.util.Log;
+import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
-import android.view.Surface;
 import android.view.WindowManager;
 
 import org.havenapp.main.PreferenceManager;
 import org.havenapp.main.model.EventTrigger;
 import org.havenapp.main.sensors.media.MotionAsyncTask;
 import org.havenapp.main.service.MonitorService;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
 
 public class Preview extends SurfaceView implements SurfaceHolder.Callback {
 	
@@ -51,7 +51,7 @@ public class Preview extends SurfaceView implements SurfaceHolder.Callback {
 
 	private final static int PREVIEW_INTERVAL = 500;
 
-	private List<MotionAsyncTask.MotionListener> listeners = new ArrayList<MotionAsyncTask.MotionListener>();
+	private List<MotionAsyncTask.MotionListener> listeners = new ArrayList<>();
 	
 	/**
 	 * Timestamp of the last picture processed
@@ -100,10 +100,10 @@ public class Preview extends SurfaceView implements SurfaceHolder.Callback {
             serviceMessenger = null;
         }
     };
-	
-	
-	SurfaceHolder mHolder;
-	public Camera camera;
+
+
+	private SurfaceHolder mHolder;
+	private Camera camera;
 	private Context context;
 
 	public Preview (Context context) {
@@ -118,15 +118,19 @@ public class Preview extends SurfaceView implements SurfaceHolder.Callback {
 		/*
 		 * Set sensitivity value
 		 */
-		if (prefs.getCameraSensitivity().equals("Medium")) {
-			motionSensitivity = LuminanceMotionDetector.MOTION_MEDIUM;
-			Log.i("CameraFragment", "Sensitivity set to Medium");
-		} else if (prefs.getCameraSensitivity().equals("Low")) {
-			motionSensitivity = LuminanceMotionDetector.MOTION_LOW;
-			Log.i("CameraFragment", "Sensitivity set to Low");
-		} else {
-			motionSensitivity = LuminanceMotionDetector.MOTION_HIGH;
-			Log.i("CameraFragment", "Sensitivity set to High");
+		switch (prefs.getCameraSensitivity()) {
+			case "Medium":
+				motionSensitivity = LuminanceMotionDetector.MOTION_MEDIUM;
+				Log.i("CameraFragment", "Sensitivity set to Medium");
+				break;
+			case "Low":
+				motionSensitivity = LuminanceMotionDetector.MOTION_LOW;
+				Log.i("CameraFragment", "Sensitivity set to Low");
+				break;
+			default:
+				motionSensitivity = LuminanceMotionDetector.MOTION_HIGH;
+				Log.i("CameraFragment", "Sensitivity set to High");
+				break;
 		}
 	}
 	
@@ -154,28 +158,30 @@ public class Preview extends SurfaceView implements SurfaceHolder.Callback {
 		 *  to draw.
 		 *  If the selected camera is the front one we open it
 		 */
-		if (prefs.getCamera().equals(PreferenceManager.FRONT)) {
-			Camera.CameraInfo cameraInfo = new Camera.CameraInfo();
-			int cameraCount = Camera.getNumberOfCameras();
-			for (int camIdx = 0; camIdx < cameraCount; camIdx++) {
-				Camera.getCameraInfo(camIdx, cameraInfo);
-				if (cameraInfo.facing == Camera.CameraInfo.CAMERA_FACING_FRONT) {
-					try {
-						camera = Camera.open(camIdx);
-						cameraFacing = Camera.CameraInfo.CAMERA_FACING_FRONT;
-					} catch (RuntimeException e) {
-						Log.e("Preview", "Camera failed to open: " + e.getLocalizedMessage());
+		switch (prefs.getCamera()) {
+			case PreferenceManager.FRONT:
+				Camera.CameraInfo cameraInfo = new Camera.CameraInfo();
+				int cameraCount = Camera.getNumberOfCameras();
+				for (int camIdx = 0; camIdx < cameraCount; camIdx++) {
+					Camera.getCameraInfo(camIdx, cameraInfo);
+					if (cameraInfo.facing == Camera.CameraInfo.CAMERA_FACING_FRONT) {
+						try {
+							camera = Camera.open(camIdx);
+							cameraFacing = Camera.CameraInfo.CAMERA_FACING_FRONT;
+						} catch (RuntimeException e) {
+							Log.e("Preview", "Camera failed to open: " + e.getLocalizedMessage());
+						}
 					}
 				}
-			}
-		} else if (prefs.getCamera().equals(PreferenceManager.BACK)) {
+				break;
+			case PreferenceManager.BACK:
 
-			camera = Camera.open();
-			cameraFacing = Camera.CameraInfo.CAMERA_FACING_BACK;
-		}
-		else
-		{
-			camera = null;
+				camera = Camera.open();
+				cameraFacing = Camera.CameraInfo.CAMERA_FACING_BACK;
+				break;
+			default:
+				camera = null;
+				break;
 		}
 
 		if (camera != null) {
@@ -183,17 +189,36 @@ public class Preview extends SurfaceView implements SurfaceHolder.Callback {
 			final Camera.Parameters parameters = camera.getParameters();
 
 			try {
-                List<Size> sizesPreviews = parameters.getSupportedPreviewSizes();
-                parameters.setPreviewSize(sizesPreviews.get(4).width, sizesPreviews.get(4).height);
-            }
-            catch (Exception e){
-			    Log.w("Camera","Error setting camera preview size",e);
-            }
+				List<Size> sizesPreviews = parameters.getSupportedPreviewSizes();
 
-			List<int[]> fpsRange = parameters.getSupportedPreviewFpsRange();
-            try {
-                parameters.setPreviewFpsRange(fpsRange.get(fpsRange.size() - 1)[1], fpsRange.get(fpsRange.size() - 1)[1]);
-            }
+				Size bestSize = sizesPreviews.get(0);
+
+				for (int i = 1; i < sizesPreviews.size(); i++) {
+					if ((sizesPreviews.get(i).width * sizesPreviews.get(i).height) >
+							(bestSize.width * bestSize.height)) {
+						bestSize = sizesPreviews.get(i);
+					}
+				}
+
+				parameters.setPreviewSize(bestSize.width, bestSize.height);
+
+			} catch (Exception e) {
+				Log.w("Camera", "Error setting camera preview size", e);
+			}
+
+			try {
+				List<int[]> ranges = parameters.getSupportedPreviewFpsRange();
+				int[] bestRange = ranges.get(0);
+				for (int i = 1; i < ranges.size(); i++) {
+					if (ranges.get(i)[1] >
+							bestRange[1]) {
+						bestRange[0] = ranges.get(i)[0];
+						bestRange[1] = ranges.get(i)[1];
+
+					}
+				}
+				parameters.setPreviewFpsRange(bestRange[0], bestRange[1]);
+			}
             catch (Exception e) {
                 Log.w("Camera","Error setting frames per second",e);
             }

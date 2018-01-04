@@ -14,11 +14,11 @@ import java.util.Date;
 
 public class EventTrigger extends SugarRecord {
 
-    int mType;
-    Date mTime;
-    long mEventId;
+    private int mType;
+    private Date mTime;
+    private long mEventId;
 
-    String mPath;
+    private String mPath;
 
     /**
      * Acceleration detected message
@@ -38,17 +38,21 @@ public class EventTrigger extends SugarRecord {
     /**
      * Pressure change detected message
      */
-    public static final int PRESSURE = 2;
+    public static final int PRESSURE = 3;
 
     /**
      * Light change detected message
      */
-    public static final int LIGHT = 3;
+    public static final int LIGHT = 4;
 
     /**
      * Power change detected message
      */
-    public static final int POWER = 4;
+    public static final int POWER = 5;
+    /**
+     * Significant motion detected message
+     */
+    public static final int BUMP = 6;
 
 
     public EventTrigger ()
@@ -104,6 +108,9 @@ public class EventTrigger extends SugarRecord {
                 break;
             case EventTrigger.POWER:
                 sType = context.getString(R.string.sensor_power);
+                break;
+            case EventTrigger.BUMP:
+                sType = context.getString(R.string.sensor_bump);
                 break;
             default:
                 sType = context.getString(R.string.sensor_unknown);
